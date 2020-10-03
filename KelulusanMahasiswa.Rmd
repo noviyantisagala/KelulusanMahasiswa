@@ -1,0 +1,170 @@
+# 0. Load library
+```{r}
+library(psych)
+library(caTools)
+library(e1071)
+library(caret)
+
+```
+
+
+
+# 1. Extract, Transform, Load (ETL)
+## 1.1. Load data
+```{r}
+setwd("C:/Users/nv/OneDrive/Documents/BUKTI E-LEarning/Training/DAta science Course-net/New folder (2)")
+kelulusan.mahasiswa <- read.csv("kelulusan.mahasiswa.csv")
+```
+
+## 1.2. Data Dictionary - feature, target, independent
+
+| nomor | nama_fitur        | tipe_data | keterangan                  | Jenis       | Proses                                                              |
+|-------|-------------------|-----------|-----------------------------|-------------|---------------------------------------------------------------------|
+| 1     | Nomor             | Integer   | nomor urut                  | Independent | Dibuang                                                             |
+| 2     | Gender            | Factorial | Jenis kelamin               | Independent | Diproses; laki-laki = 0, perempuan = 1,  new_feature; jenis_kelamin |
+| 3     | Kelas             | Factorial | Kelas                       | Independent | Diproses; Reguler = 0, Executive = 1 new_feature; Jenis.Kelas       |
+| 4     | Status.Pernikahan | Factorial | status pernikahan           | Independent | diproses; Menikah = 0, belum = 1 new_feature; Status.Nikah          |
+| 5     | IPK.Semester.6    | Double    | IPK mahasiswa di semester 6 | Independent | Dipertahankan                                                       |
+| 6     | Status.Kelulusan  | Factorial | lulus atau tidak lulus      | Target      | Diproses; lulus = 1, belum = 0 new_feature; Keputusan.Akhir         |
+
+# 2. Feature engineering
+## 2.1. Feature engineering
+### 2.1.1. Remove features that not needed
+
+```{r}
+# option: kelulusan.mahasiswa$nomor <- NULL
+kelulusan.mahasiswa$NO <- NULL
+head(kelulusan.mahasiswa)
+```
+
+
+
+### 2.1.2. Add features if needed
+
+```{r}
+kelulusan.mahasiswa$Jenis.Kelamin <- ifelse(kelulusan.mahasiswa$Gender == 'LAKI - LAKI', 1, 2)
+head(kelulusan.mahasiswa)
+kelulusan.mahasiswa$Gender <- NULL
+head(kelulusan.mahasiswa)
+
+kelulusan.mahasiswa$Tipe.Kelas <- ifelse(kelulusan.mahasiswa$KELAS == 'REGULER', 1, 2)
+head(kelulusan.mahasiswa)
+kelulusan.mahasiswa$KELAS <- NULL
+head(kelulusan.mahasiswa)
+
+kelulusan.mahasiswa$Nikah <- ifelse(kelulusan.mahasiswa$STATUS.PERNIKAHAN == 'MENIKAH', 1, 2)
+head(kelulusan.mahasiswa)
+kelulusan.mahasiswa$STATUS.PERNIKAHAN  <- NULL
+head(kelulusan.mahasiswa)
+
+kelulusan.mahasiswa$Kelulusan <- ifelse(kelulusan.mahasiswa$STATUS.KELULUSAN == 'TEPAT', 1, 0)
+head(kelulusan.mahasiswa)
+kelulusan.mahasiswa$STATUS.KELULUSAN <- NULL
+head(kelulusan.mahasiswa)
+
+#kelulusan.mahasiswa <- kelulusan.mahasiswa[,c(1,3,4,5,2,6)]
+#head(kelulusan.mahasiswa)
+```
+
+## 2.2. Check if there are NULL value
+
+```{r}
+colSums(is.na(kelulusan.mahasiswa))
+
+```
+tidak ada data nol ditemukan, pemrosesan data dapat dilanjutkan.
+
+### 2.2.1 Imputing process (if there's NULL)
+Cara imputing adalah:
+1. Hapus data dengan `complete.cases()` jika jumlah data kosong tidak terlalu banyak;
+2. Ganti data dengan `mean()` jika datanya angka dan **tidak** ada _outlier_;
+3. Ganti data dengan `median()` jika datanya angka dan ada _outlier_;
+4. Ganti data dengan modus jika datanya `factorial` atau `string` dan distribusi variasi datanya beragam. Fungsi `table()` dapat membantu modus dari data;
+5. Ganti dengan angka acak jika datanya `factorial` atau `string` dan distribusi variasi datanya imbang.
+
+Uji lagi apakah ada data kosong?
+
+## 2.3. Check Unary data
+
+```{r}
+apply(kelulusan.mahasiswa, 2, max) - apply(kelulusan.mahasiswa, 2, min)
+```
+bukan unary data
+
+# 3. Exploratory Data Analysis (EDA)
+## 3.1. Descriptive Statistics
+
+```{r}
+summary(kelulusan.mahasiswa)
+```
+```{r}
+cor(kelulusan.mahasiswa)
+
+```
+```{r}
+describe(kelulusan.mahasiswa)[11:12]
+```
+batas kurtosis <= 2
+skew dikatakan baik -2 hingga +2
+
+## 3.2. Visualisation
+
+```{r}
+boxplot(kelulusan.mahasiswa)
+```
+```{r}
+plot(density(kelulusan.mahasiswa$IPK.Semester.6))
+```
+
+# 4. Fitting/Model
+## 4.1 Splitting
+
+```{r}
+split <- sample.split(kelulusan.mahasiswa$Kelulusan, SplitRatio = 0.8)
+train <- subset(kelulusan.mahasiswa, split == TRUE)
+test <- subset(kelulusan.mahasiswa, split == FALSE)
+```
+
+## 4.2 Modeling
+
+```{r}
+nb <- naiveBayes(Kelulusan ~ IPK.Semester.6 + Jenis.Kelamin + Tipe.Kelas + Nikah, train)
+
+```
+
+# 5. Model Performance
+
+
+## 5.1 Inferential Statistic approach
+
+```{r}
+kj <- test$Kelulusan
+head(kj)
+```
+```{r}
+prediksi <- predict(nb, newdata = test, type = "raw")
+head(prediksi)
+```
+```{r}
+try <- ifelse(prediksi[,2] > 0.5, 1, 0)
+head(try)
+```
+
+```{r}
+confusionMatrix(table(kj, try))
+```
+
+
+## 5.2 Visualization approach
+
+# 6. Prediction/Forecasting
+```{r}
+data <-  data.frame(Jenis.Kelamin= 1, Tipe.Kelas = 1, Nikah = 1, IPK.Semester.6 = 3.0)
+
+predict(nb, newdata = data, type = "raw")
+```
+
+Jika mahasiswa berjenis kelamin laki-laki mengambil kelas reguler, sudah menikah dan IPK semester 6 adalah 3, maka 89% lulus tepat waktu
+
+
+# 7. Further Prescription Analysis/Recommendation
